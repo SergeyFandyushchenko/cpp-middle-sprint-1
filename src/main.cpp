@@ -1,102 +1,106 @@
 #include "cmd_options.h"
 #include "crypto_guard_ctx.h"
-#include <algorithm>
-#include <array>
-#include <iostream>
+
 #include <openssl/evp.h>
+
+#include <fstream>
+#include <iostream>
 #include <print>
 #include <stdexcept>
-#include <string>
 
-struct AesCipherParams {
-    static const size_t KEY_SIZE = 32;             // AES-256 key size
-    static const size_t IV_SIZE = 16;              // AES block size (IV length)
-    const EVP_CIPHER *cipher = EVP_aes_256_cbc();  // Cipher algorithm
-
-    int encrypt;                              // 1 for encryption, 0 for decryption
-    std::array<unsigned char, KEY_SIZE> key;  // Encryption key
-    std::array<unsigned char, IV_SIZE> iv;    // Initialization vector
-};
-
-AesCipherParams CreateChiperParamsFromPassword(std::string_view password) {
-    AesCipherParams params;
-    constexpr std::array<unsigned char, 8> salt = {'1', '2', '3', '4', '5', '6', '7', '8'};
-
-    int result = EVP_BytesToKey(params.cipher, EVP_sha256(), salt.data(),
-                                reinterpret_cast<const unsigned char *>(password.data()), password.size(), 1,
-                                params.key.data(), params.iv.data());
-
-    if (result == 0) {
-        throw std::runtime_error{"Failed to create a key from password"};
-    }
-
-    return params;
-}
+#include <filesystem>
 
 int main(int argc, char *argv[]) {
+    {
+        // Debug: print current working directory
+        std::cout << "Current working directory: " << std::filesystem::current_path() << std::endl;
+
+        // Debug: check if file exists
+        std::string inputFile = "input.txt";  // or whatever path
+        if (std::filesystem::exists(inputFile)) {
+            std::cout << "File exists: " << inputFile << std::endl;
+        } else {
+            std::cout << "File does NOT exist: " << inputFile << std::endl;
+        }
+    }
+
     try {
-        //
-        // OpenSSL пример использования:
-        //
-        std::string input = "01234567890123456789";
-        std::string output;
-
-        OpenSSL_add_all_algorithms();
-
-        auto params = CreateChiperParamsFromPassword("12341234");
-        params.encrypt = 1;
-        auto *ctx = EVP_CIPHER_CTX_new();
-
-        // Инициализируем cipher
-        EVP_CipherInit_ex(ctx, params.cipher, nullptr, params.key.data(), params.iv.data(), params.encrypt);
-
-        std::vector<unsigned char> outBuf(16 + EVP_MAX_BLOCK_LENGTH);
-        std::vector<unsigned char> inBuf(16);
-        int outLen;
-
-        // Обрабатываем первые N символов
-        std::copy(input.begin(), std::next(input.begin(), 16), inBuf.begin());
-        EVP_CipherUpdate(ctx, outBuf.data(), &outLen, inBuf.data(), static_cast<int>(16));
-        for (int i = 0; i < outLen; ++i) {
-            output.push_back(outBuf[i]);
-        }
-
-        // Обрабатываем оставшиеся символы
-        std::copy(std::next(input.begin(), 16), input.end(), inBuf.begin());
-        EVP_CipherUpdate(ctx, outBuf.data(), &outLen, inBuf.data(), static_cast<int>(input.size() - 16));
-        for (int i = 0; i < outLen; ++i) {
-            output.push_back(outBuf[i]);
-        }
-
-        // Заканчиваем работу с cipher
-        EVP_CipherFinal_ex(ctx, outBuf.data(), &outLen);
-        for (int i = 0; i < outLen; ++i) {
-            output.push_back(outBuf[i]);
-        }
-        EVP_CIPHER_CTX_free(ctx);
-        std::print("String encoded successfully. Result: '{}'\n\n", output);
-        EVP_cleanup();
-        //
-        // Конец примера
-        //
-
         CryptoGuard::ProgramOptions options;
+        options.Parse(argc, argv);
+
+        auto command = options.GetCommand();
+        auto inputFile = options.GetInputFile();
+        auto outputFile = options.GetOutputFile();
+        auto password = options.GetPassword();
+
+        std::print("Command: {}\n", command == CryptoGuard::ProgramOptions::COMMAND_TYPE::ENCRYPT   ? "encrypt"
+                                    : command == CryptoGuard::ProgramOptions::COMMAND_TYPE::DECRYPT ? "decrypt"
+                                                                                                    : "checksum");
+        std::print("Input file: {}\n", inputFile);
+
+        if (!outputFile.empty()) {
+            std::print("Output file: {}\n", outputFile);
+        }
+
+        if (!password.empty()) {
+            std::print("Password: {} (length: {})\n", std::string(password.size(), '*'), password.size());
+        }
 
         CryptoGuard::CryptoGuardCtx cryptoCtx;
 
         using COMMAND_TYPE = CryptoGuard::ProgramOptions::COMMAND_TYPE;
-        switch (options.GetCommand()) {
-        case COMMAND_TYPE::ENCRYPT:
-            std::print("File encoded successfully\n");
-            break;
 
-        case COMMAND_TYPE::DECRYPT:
-            std::print("File decoded successfully\n");
-            break;
+        switch (command) {
+        case COMMAND_TYPE::ENCRYPT: {
+            std::print("\nStarting encryption process...\n");
 
-        case COMMAND_TYPE::CHECKSUM:
-            std::print("Checksum: {}\n", "CHECKSUM_NOT_IMPLEMENTED");
+            std::fstream inFile(inputFile, std::ios::in | std::ios::binary);
+            if (!inFile.is_open()) {
+                throw std::runtime_error("Cannot open input file: " + inputFile);
+            }
+
+            std::fstream outFile(outputFile, std::ios::out | std::ios::binary);
+            if (!outFile.is_open()) {
+                throw std::runtime_error("Cannot create output file: " + outputFile);
+            }
+
+            cryptoCtx.EncryptFile(inFile, outFile, password);
+
+            std::print("File '{}' encrypted successfully to '{}'\n", inputFile, outputFile);
             break;
+        }
+
+        case COMMAND_TYPE::DECRYPT: {
+            std::print("\nStarting decryption process...\n");
+
+            std::fstream inFile(inputFile, std::ios::in | std::ios::binary);
+            if (!inFile.is_open()) {
+                throw std::runtime_error("Cannot open input file: " + inputFile);
+            }
+
+            std::fstream outFile(outputFile, std::ios::out | std::ios::binary);
+            if (!outFile.is_open()) {
+                throw std::runtime_error("Cannot create output file: " + outputFile);
+            }
+
+            cryptoCtx.DecryptFile(inFile, outFile, password);
+
+            std::print("File '{}' decrypted successfully to '{}'\n", inputFile, outputFile);
+            break;
+        }
+
+        case COMMAND_TYPE::CHECKSUM: {
+            std::print("\nCalculating checksum...\n");
+
+            std::fstream inFile(inputFile, std::ios::in | std::ios::binary);
+            if (!inFile.is_open()) {
+                throw std::runtime_error("Cannot open input file: " + inputFile);
+            }
+
+            std::string checksum = cryptoCtx.CalculateChecksum(inFile);
+            std::print("Checksum (SHA-256): {}\n", checksum);
+            break;
+        }
 
         default:
             throw std::runtime_error{"Unsupported command"};

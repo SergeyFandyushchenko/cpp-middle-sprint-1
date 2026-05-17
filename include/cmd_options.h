@@ -9,7 +9,7 @@ namespace CryptoGuard {
 class ProgramOptions {
 public:
     ProgramOptions();
-    ~ProgramOptions();
+    ~ProgramOptions() = default;
 
     enum class COMMAND_TYPE {
         ENCRYPT,
