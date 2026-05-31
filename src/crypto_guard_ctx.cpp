@@ -18,6 +18,8 @@ constexpr size_t IV_SIZE = 16;   // AES block size (IV length)
 constexpr size_t BUFFER_SIZE = 4096;
 constexpr std::array<unsigned char, 8> SALT = {'1', '2', '3', '4', '5', '6', '7', '8'};
 
+std::array<char, 256> BUF;
+
 struct AesCipherParams {
     const EVP_CIPHER *cipher = EVP_aes_256_cbc();  // Cipher algorithm
 
@@ -45,9 +47,8 @@ using EvpCipherCtxPtr = std::unique_ptr<EVP_CIPHER_CTX, EvpCipherCtxDeleter>;
 using EvpMdCtxPtr = std::unique_ptr<EVP_MD_CTX, EvpMdCtxDeleter>;
 
 std::string GetOpenSSLError() {
-    char buf[256];
-    ERR_error_string_n(ERR_get_error(), buf, sizeof(buf));
-    return std::string(buf);
+    ERR_error_string_n(ERR_get_error(), BUF.data(), BUF.size());
+    return std::string(BUF.data());
 }
 
 void ThrowOpenSSLError(const std::string &context) { throw std::runtime_error(context + ": " + GetOpenSSLError()); }
@@ -118,6 +119,14 @@ void CryptoGuardCtx::Impl::ProcessStream(std::iostream &inStream, std::iostream 
                 }
             }
         }
+    }
+
+    if (inStream.bad()) {
+        throw std::runtime_error("Input stream is in bad state");
+    }
+
+    if (inStream.fail() && !inStream.eof()) {
+        throw std::runtime_error("Input stream error (failbit set, not EOF)");
     }
 
     if (EVP_CipherFinal_ex(ctx.get(), outBuffer.data(), &outLen) != 1) {

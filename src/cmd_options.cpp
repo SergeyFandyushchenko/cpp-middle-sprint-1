@@ -20,7 +20,7 @@ ProgramOptions::ProgramOptions() : desc_("Allowed options") {
     // clang-format on
 }
 
-void ProgramOptions::Parse(int argc, char *argv[]) {
+ProgramOptions::STATUS_PARSE ProgramOptions::Parse(int argc, char *argv[]) {
     try {
         po::variables_map vm;
 
@@ -29,7 +29,7 @@ void ProgramOptions::Parse(int argc, char *argv[]) {
 
         if (vm.count("help")) {
             std::cout << desc_ << std::endl;
-            exit(EXIT_SUCCESS);
+            return STATUS_PARSE::SUCCESS_EXIT;
         }
 
         if (!vm.count("command")) {
@@ -87,12 +87,14 @@ void ProgramOptions::Parse(int argc, char *argv[]) {
     } catch (const po::error &e) {
         std::cerr << "Command line parsing error: " << e.what() << std::endl;
         std::cerr << "Use --help for help" << std::endl;
-        exit(EXIT_FAILURE);
+        return STATUS_PARSE::FAILURE_EXIT;
     } catch (const std::exception &e) {
         std::cerr << e.what() << std::endl;
         std::cerr << "Use --help for help" << std::endl;
-        exit(EXIT_FAILURE);
+        return STATUS_PARSE::FAILURE_EXIT;
     }
+
+    return STATUS_PARSE::SUCCESS;
 }
 
 }  // namespace CryptoGuard

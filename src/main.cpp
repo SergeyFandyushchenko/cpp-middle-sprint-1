@@ -26,7 +26,12 @@ int main(int argc, char *argv[]) {
 
     try {
         CryptoGuard::ProgramOptions options;
-        options.Parse(argc, argv);
+        if (auto status = options.Parse(argc, argv);
+            status == CryptoGuard::ProgramOptions::STATUS_PARSE::SUCCESS_EXIT) {
+            exit(EXIT_SUCCESS);
+        } else if (status == CryptoGuard::ProgramOptions::STATUS_PARSE::FAILURE_EXIT) {
+            exit(EXIT_FAILURE);
+        }
 
         auto command = options.GetCommand();
         auto inputFile = options.GetInputFile();
@@ -105,7 +110,6 @@ int main(int argc, char *argv[]) {
         default:
             throw std::runtime_error{"Unsupported command"};
         }
-
     } catch (const std::exception &e) {
         std::print(std::cerr, "Error: {}\n", e.what());
         return 1;

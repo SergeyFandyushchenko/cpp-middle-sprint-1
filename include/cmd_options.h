@@ -17,7 +17,9 @@ public:
         CHECKSUM,
     };
 
-    void Parse(int argc, char *argv[]);
+    enum class STATUS_PARSE { SUCCESS, SUCCESS_EXIT, FAILURE_EXIT };
+
+    [[nodiscard]] STATUS_PARSE Parse(int argc, char *argv[]);
 
     COMMAND_TYPE GetCommand() const { return command_; }
     std::string GetInputFile() const { return inputFile_; }

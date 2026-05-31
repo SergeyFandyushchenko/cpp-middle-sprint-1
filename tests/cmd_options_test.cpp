@@ -5,14 +5,40 @@
 
 using namespace CryptoGuard;
 
+// To test successful scenarios
+ProgramOptions ExpectParseSuccess(const char *argv[], size_t argc) {
+    ProgramOptions options;
+    auto status = options.Parse(static_cast<int>(argc), const_cast<char **>(argv));
+    EXPECT_EQ(status, ProgramOptions::STATUS_PARSE::SUCCESS);
+    return options;
+}
+
+template <size_t N>
+ProgramOptions ExpectParseSuccess(const char *(&argv)[N]) {
+    return ExpectParseSuccess(argv, N);
+}
+
+// For testing erroneous scenarios
+void ExpectParseFailure(const char *argv[], size_t argc, const std::string &expectedErrorSubstring) {
+    ProgramOptions options;
+    testing::internal::CaptureStderr();
+    auto status = options.Parse(static_cast<int>(argc), const_cast<char **>(argv));
+    std::string stderr_output = testing::internal::GetCapturedStderr();
+
+    EXPECT_EQ(status, ProgramOptions::STATUS_PARSE::FAILURE_EXIT);
+    EXPECT_THAT(stderr_output, ::testing::HasSubstr(expectedErrorSubstring));
+}
+
+template <size_t N>
+void ExpectParseFailure(const char *(&argv)[N], const std::string &expectedErrorSubstring) {
+    ExpectParseFailure(argv, N, expectedErrorSubstring);
+}
+
 // Test 1: Verify correct parsing of encrypt command with all parameters
 TEST(ProgramOptions, ValidEncryptCommand) {
-    ProgramOptions options;
     const char *argv[] = {"program",  "--command",     "encrypt",    "--input",  "test.txt",
                           "--output", "encrypted.bin", "--password", "secret123"};
-    int argc = sizeof(argv) / sizeof(argv[0]);
-
-    EXPECT_NO_THROW(options.Parse(argc, const_cast<char **>(argv)));
+    auto options = ExpectParseSuccess(argv);
     EXPECT_EQ(options.GetCommand(), ProgramOptions::COMMAND_TYPE::ENCRYPT);
     EXPECT_EQ(options.GetInputFile(), "test.txt");
     EXPECT_EQ(options.GetOutputFile(), "encrypted.bin");
@@ -21,12 +47,9 @@ TEST(ProgramOptions, ValidEncryptCommand) {
 
 // Test 2: Verify correct parsing of decrypt command
 TEST(ProgramOptions, ValidDecryptCommand) {
-    ProgramOptions options;
     const char *argv[] = {"program",  "--command",     "decrypt",    "--input",  "encrypted.bin",
                           "--output", "decrypted.txt", "--password", "secret123"};
-    int argc = sizeof(argv) / sizeof(argv[0]);
-
-    EXPECT_NO_THROW(options.Parse(argc, const_cast<char **>(argv)));
+    auto options = ExpectParseSuccess(argv);
     EXPECT_EQ(options.GetCommand(), ProgramOptions::COMMAND_TYPE::DECRYPT);
     EXPECT_EQ(options.GetInputFile(), "encrypted.bin");
     EXPECT_EQ(options.GetOutputFile(), "decrypted.txt");
@@ -35,11 +58,8 @@ TEST(ProgramOptions, ValidDecryptCommand) {
 
 // Test 3: Verify checksum command (does not require output and password)
 TEST(ProgramOptions, ValidChecksumCommand) {
-    ProgramOptions options;
     const char *argv[] = {"program", "--command", "checksum", "--input", "file.txt"};
-    int argc = sizeof(argv) / sizeof(argv[0]);
-
-    EXPECT_NO_THROW(options.Parse(argc, const_cast<char **>(argv)));
+    auto options = ExpectParseSuccess(argv);
     EXPECT_EQ(options.GetCommand(), ProgramOptions::COMMAND_TYPE::CHECKSUM);
     EXPECT_EQ(options.GetInputFile(), "file.txt");
     EXPECT_TRUE(options.GetOutputFile().empty());
@@ -48,41 +68,26 @@ TEST(ProgramOptions, ValidChecksumCommand) {
 
 // Test 4: Verify handling of unknown command
 TEST(ProgramOptions, UnknownCommand) {
-    ProgramOptions options;
     const char *argv[] = {"program", "--command", "unknown", "--input", "test.txt"};
-    int argc = sizeof(argv) / sizeof(argv[0]);
-
-    EXPECT_EXIT(options.Parse(argc, const_cast<char **>(argv)), ::testing::ExitedWithCode(EXIT_FAILURE),
-                ".*unknown command.*");
+    ExpectParseFailure(argv, "unknown command");
 }
 
 // Test 5: Verify missing required command
 TEST(ProgramOptions, MissingCommand) {
-    ProgramOptions options;
     const char *argv[] = {"program", "--input", "test.txt", "--output", "out.bin"};
-    int argc = sizeof(argv) / sizeof(argv[0]);
-
-    EXPECT_EXIT(options.Parse(argc, const_cast<char **>(argv)), ::testing::ExitedWithCode(EXIT_FAILURE),
-                ".*command not specified.*");
+    ExpectParseFailure(argv, "command not specified");
 }
 
 // Test 6: Verify missing input file
 TEST(ProgramOptions, MissingInputFile) {
-    ProgramOptions options;
     const char *argv[] = {"program", "--command", "encrypt", "--output", "out.bin", "--password", "pass"};
-    int argc = sizeof(argv) / sizeof(argv[0]);
-
-    EXPECT_EXIT(options.Parse(argc, const_cast<char **>(argv)), ::testing::ExitedWithCode(EXIT_FAILURE),
-                ".*input file not specified.*");
+    ExpectParseFailure(argv, "input file not specified");
 }
 
 // Test 7: Verify handling of short options
 TEST(ProgramOptions, ShortOptions) {
-    ProgramOptions options;
     const char *argv[] = {"program", "-c", "encrypt", "-i", "input.txt", "-o", "output.bin", "-p", "mypass"};
-    int argc = sizeof(argv) / sizeof(argv[0]);
-
-    EXPECT_NO_THROW(options.Parse(argc, const_cast<char **>(argv)));
+    auto options = ExpectParseSuccess(argv);
     EXPECT_EQ(options.GetCommand(), ProgramOptions::COMMAND_TYPE::ENCRYPT);
     EXPECT_EQ(options.GetInputFile(), "input.txt");
     EXPECT_EQ(options.GetOutputFile(), "output.bin");
@@ -91,33 +96,21 @@ TEST(ProgramOptions, ShortOptions) {
 
 // Test 8: Verify missing password for encrypt
 TEST(ProgramOptions, MissingPasswordForEncrypt) {
-    ProgramOptions options;
     const char *argv[] = {"program", "--command", "encrypt", "--input", "test.txt", "--output", "out.bin"};
-    int argc = sizeof(argv) / sizeof(argv[0]);
-
-    EXPECT_EXIT(options.Parse(argc, const_cast<char **>(argv)), ::testing::ExitedWithCode(EXIT_FAILURE),
-                ".*password must be specified.*");
+    ExpectParseFailure(argv, "password must be specified");
 }
 
 // Test 9: Verify missing output for encrypt
 TEST(ProgramOptions, MissingOutputForEncrypt) {
-    ProgramOptions options;
     const char *argv[] = {"program", "--command", "encrypt", "--input", "test.txt", "--password", "pass"};
-    int argc = sizeof(argv) / sizeof(argv[0]);
-
-    EXPECT_EXIT(options.Parse(argc, const_cast<char **>(argv)), ::testing::ExitedWithCode(EXIT_FAILURE),
-                ".*output file must be specified.*");
+    ExpectParseFailure(argv, "output file must be specified");
 }
 
 // Test 10: Verify input and output files are the same
 TEST(ProgramOptions, SameInputAndOutputFiles) {
-    ProgramOptions options;
     const char *argv[] = {"program",  "--command", "encrypt",    "--input", "same.txt",
                           "--output", "same.txt",  "--password", "pass"};
-    int argc = sizeof(argv) / sizeof(argv[0]);
-
-    EXPECT_EXIT(options.Parse(argc, const_cast<char **>(argv)), ::testing::ExitedWithCode(EXIT_FAILURE),
-                ".*cannot be the same.*");
+    ExpectParseFailure(argv, "cannot be the same");
 }
 
 // Test 11: Verify help command
@@ -126,10 +119,11 @@ TEST(ProgramOptions, HelpCommand) {
     const char *argv[] = {"program", "--help"};
     int argc = sizeof(argv) / sizeof(argv[0]);
 
-    // Redirect stdout to check help output
     testing::internal::CaptureStdout();
-    EXPECT_EXIT(options.Parse(argc, const_cast<char **>(argv)), ::testing::ExitedWithCode(EXIT_SUCCESS), ".*");
+    auto status = options.Parse(argc, const_cast<char **>(argv));
     std::string output = testing::internal::GetCapturedStdout();
+
+    EXPECT_EQ(status, ProgramOptions::STATUS_PARSE::SUCCESS_EXIT);
     EXPECT_THAT(output, ::testing::HasSubstr("Allowed options"));
     EXPECT_THAT(output, ::testing::HasSubstr("--help"));
     EXPECT_THAT(output, ::testing::HasSubstr("--command"));
@@ -140,10 +134,6 @@ TEST(ProgramOptions, HelpCommand) {
 
 // Test 12: Verify case sensitivity of commands
 TEST(ProgramOptions, CaseSensitiveCommands) {
-    ProgramOptions options;
     const char *argv[] = {"program", "--command", "ENCRYPT", "--input", "test.txt"};
-    int argc = sizeof(argv) / sizeof(argv[0]);
-
-    EXPECT_EXIT(options.Parse(argc, const_cast<char **>(argv)), ::testing::ExitedWithCode(EXIT_FAILURE),
-                ".*unknown command.*");
+    ExpectParseFailure(argv, "unknown command");
 }
