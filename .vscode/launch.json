@@ -1,7 +1,4 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
@@ -10,25 +7,70 @@
             "name": "Launch Debug app",
             "program": "${workspaceFolder}/build/CryptoGuard",
             "args": [
-                "-i",
-                "input.txt",
-                "--command",
-                "checksum"
+                "-i", "input.txt",
+                "--command", "checksum"
             ],
             "cwd": "${workspaceFolder}/build",
-            "preLaunchTask": "GCC: Build Debug",
-            "initCommands": ["settings set target.disable-aslr false"]
+            "initCommands": [
+                "settings set target.disable-aslr false"
+            ]
         },
         {
             "type": "lldb",
             "request": "launch",
             "name": "Launch Debug unit_tests",
             "program": "${workspaceFolder}/build/unit_tests",
+            "args": [],
+            "cwd": "${workspaceFolder}/build",
+            "initCommands": [
+                "settings set target.disable-aslr false"
+            ]
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Encrypt File",
+            "program": "${workspaceFolder}/build/CryptoGuard",
             "args": [
+                "-i", "input.txt",
+                "-o", "output.txt",
+                "-p", "310879",
+                "--command", "encrypt"
             ],
             "cwd": "${workspaceFolder}/build",
-            "preLaunchTask": "GCC: Build Debug",
-            "initCommands": ["settings set target.disable-aslr false"]
+            "initCommands": [
+                "settings set target.disable-aslr false"
+            ]
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Decrypt File",
+            "program": "${workspaceFolder}/build/CryptoGuard",
+            "args": [
+                "-i", "output.txt",
+                "-o", "input.txt",
+                "-p", "310879",
+                "--command", "decrypt"
+            ],
+            "cwd": "${workspaceFolder}/build",
+            "initCommands": [
+                "settings set target.disable-aslr false"
+            ]
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Checksum File",
+            "program": "${workspaceFolder}/build/CryptoGuard",
+            "args": [
+                "-i", "input.txt",
+                "--command", "checksum"
+            ],
+            "cwd": "${workspaceFolder}/build",
+            "initCommands": [
+                "settings set target.disable-aslr false"
+            ]
         }
     ]
 }
