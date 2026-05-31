@@ -5,6 +5,7 @@
 #include <openssl/sha.h>
 
 #include <array>
+#include <cstring>
 #include <iomanip>
 #include <iostream>
 #include <vector>
@@ -17,8 +18,6 @@ constexpr size_t KEY_SIZE = 32;  // AES-256 key size
 constexpr size_t IV_SIZE = 16;   // AES block size (IV length)
 constexpr size_t BUFFER_SIZE = 4096;
 constexpr std::array<unsigned char, 8> SALT = {'1', '2', '3', '4', '5', '6', '7', '8'};
-
-std::array<char, 256> BUF;
 
 struct AesCipherParams {
     const EVP_CIPHER *cipher = EVP_aes_256_cbc();  // Cipher algorithm
@@ -47,8 +46,10 @@ using EvpCipherCtxPtr = std::unique_ptr<EVP_CIPHER_CTX, EvpCipherCtxDeleter>;
 using EvpMdCtxPtr = std::unique_ptr<EVP_MD_CTX, EvpMdCtxDeleter>;
 
 std::string GetOpenSSLError() {
-    ERR_error_string_n(ERR_get_error(), BUF.data(), BUF.size());
-    return std::string(BUF.data());
+    std::string buf(256, '\0');
+    ERR_error_string_n(ERR_get_error(), buf.data(), buf.size());
+    buf.resize(std::strlen(buf.c_str()));
+    return buf;
 }
 
 void ThrowOpenSSLError(const std::string &context) { throw std::runtime_error(context + ": " + GetOpenSSLError()); }
